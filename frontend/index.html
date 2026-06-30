@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Heart disease risk prediction from clinical patient data. Powered by a trained SVM classifier via FastAPI." />
+  <meta property="og:title" content="Heart Disease Prediction" />
+  <meta property="og:description" content="Clinical heart disease risk prediction — enter patient data and get an instant binary diagnosis estimate." />
+  <meta name="theme-color" content="#0d0b09" />
+  <title>Heart Disease Prediction</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d0b09;
+      --bg-elevated: #141008;
+      --surface: rgba(22, 17, 11, 0.84);
+      --surface-strong: rgba(28, 22, 14, 0.96);
+      --surface-soft: rgba(255, 255, 255, 0.03);
+      --surface-hover: rgba(255, 255, 255, 0.055);
+      --border: rgba(180, 160, 120, 0.14);
+      --border-strong: rgba(180, 160, 120, 0.24);
+      --text: #f5f0e8;
+      --text-muted: rgba(235, 225, 205, 0.72);
+      --text-soft: rgba(235, 225, 205, 0.50);
+      --accent: #c9a84c;
+      --accent-strong: #e8c87a;
+      --accent-dim: rgba(201, 168, 76, 0.16);
+      --accent-rgb: 201, 168, 76;
+      --success: #7ec8a8;
+      --success-bg: rgba(28, 72, 54, 0.48);
+      --danger: #e08070;
+      --danger-bg: rgba(90, 35, 28, 0.46);
+      --warning: #e8b86a;
+      --shadow: 0 30px 80px rgba(0,0,0,0.44), 0 6px 20px rgba(5,4,2,0.28);
+      --shadow-soft: 0 18px 40px rgba(0,0,0,0.28);
+      --radius-xl: 28px;
+      --radius-lg: 22px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+      --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+      --ease-soft: cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0; min-height: 100dvh;
+      font-family: "Outfit","Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 14% 12%, rgba(201, 168, 76, 0.09), transparent 24%),
+        radial-gradient(circle at 82% 4%, rgba(180, 100, 80, 0.06), transparent 20%),
+        radial-gradient(circle at 90% 85%, rgba(201, 168, 76, 0.06), transparent 24%),
+        linear-gradient(180deg,#0d0b09 0%,#100d08 54%,#0d0b09 100%);
+      position: relative; overflow-x: hidden;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    body::before, body::after {
+      content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    }
+    body::before {
+      background:
+        radial-gradient(circle at 20% 10%, rgba(255,255,255,0.04), transparent 18%),
+        radial-gradient(circle at 80% 20%, rgba(255,255,255,0.025), transparent 16%);
+      opacity: 0.7;
+    }
+    body::after {
+      opacity: 0.06;
+      background-image:
+        linear-gradient(0deg, rgba(255,255,255,0.22) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.22) 1px, transparent 1px);
+      background-size: 72px 72px;
+      mask-image: radial-gradient(circle at center, black 52%, transparent 100%);
+    }
+    a { color: inherit; text-decoration: none; }
+    img { max-width: 100%; display: block; }
+
+    .skip-link {
+      position: absolute; left: 1rem; top: 1rem; z-index: 20; padding: 0.75rem 1rem;
+      border-radius: 999px; background: var(--accent-strong); color: #071012;
+      font-weight: 700; transform: translateY(-180%);
+      transition: transform 160ms var(--ease-out);
+    }
+    .skip-link:focus { transform: translateY(0); outline: none; }
+
+    .page { position: relative; z-index: 1; max-width: 1320px; margin: 0 auto; padding: 24px 20px 40px; }
+
+    /* ── TOPBAR ── */
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 26px; }
+    .brand { display: inline-flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-mark {
+      width: 42px; height: 42px; border-radius: 14px;
+      background: linear-gradient(135deg, rgba(201,168,76,0.95), rgba(201,168,76,0.18)), rgba(255,255,255,0.04);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 16px 32px rgba(30,20,5,0.38);
+      display: grid; place-items: center; color: #071012; font-weight: 800;
+      font-size: 0.78rem; letter-spacing: 0.02em; flex: none;
+    }
+    .brand-copy { display: grid; gap: 2px; min-width: 0; }
+    .brand-copy strong { font-size: 0.98rem; letter-spacing: -0.02em; }
+    .brand-copy span { color: var(--text-soft); font-size: 0.9rem; }
+    .topbar-meta { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 8px; padding: 0.62rem 0.92rem;
+      border-radius: 999px; border: 1px solid var(--border);
+      background: rgba(255,255,255,0.03); color: var(--text-muted); font-size: 0.88rem; line-height: 1;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+    .chip strong { color: var(--text); font-weight: 600; }
+    .chip .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--accent); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.14); flex: none; }
+
+    /* ── HERO ── */
+    .hero { display: grid; grid-template-columns: minmax(0,1.18fr) minmax(300px,0.82fr); gap: 24px; align-items: stretch; margin-bottom: 24px; }
+    .hero-copy, .hero-signal, .panel, .results-panel {
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.025)), var(--surface);
+      backdrop-filter: blur(20px) saturate(120%);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius-xl);
+    }
+    .hero-copy { padding: 28px; display: grid; gap: 18px; align-content: start; }
+    .eyebrow { margin: 0; color: var(--accent); font-size: 0.86rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+    h1, h2, h3 { margin: 0; text-wrap: balance; letter-spacing: -0.04em; }
+    h1 { font-size: clamp(2.4rem,4.8vw,4.6rem); line-height: 0.96; max-width: 13ch; }
+    .hero-copy p, .panel-copy, .results-note, .field-message, .form-status { color: var(--text-muted); line-height: 1.65; }
+    .hero-copy > p { margin: 0; max-width: 60ch; font-size: 1.02rem; }
+    .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
+
+    .button, .button-secondary {
+      appearance: none; border: 0; border-radius: 999px; min-height: 48px; padding: 0.86rem 1.15rem;
+      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+      font: inherit; font-weight: 700; letter-spacing: -0.01em; cursor: pointer;
+      transition: transform 160ms var(--ease-out), background-color 160ms var(--ease-out),
+        border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out), color 160ms var(--ease-out);
+      will-change: transform;
+    }
+    .button { background: linear-gradient(135deg, rgba(201,168,76,1), rgba(232,200,122,0.95)); color: #1a1200; box-shadow: 0 16px 34px rgba(80,55,5,0.32); }
+    .button-secondary { background: rgba(255,255,255,0.02); color: var(--text); border: 1px solid rgba(255,255,255,0.1); box-shadow: inset 0 1px 0 rgba(255,255,255,0.04); }
+    .button .icon, .button-secondary .icon { width: 18px; height: 18px; flex: none; }
+    .button:active, .button-secondary:active { transform: scale(0.97); }
+    .button:disabled { opacity: 0.72; cursor: progress; transform: none; box-shadow: none; }
+
+    .hero-signal { padding: 26px; display: grid; gap: 20px; align-content: start; }
+    .signal-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+    .signal-card {
+      border-radius: var(--radius-md); background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08); padding: 14px;
+      min-height: 100px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+      transition: background 180ms var(--ease-soft), transform 180ms var(--ease-soft), border-color 180ms var(--ease-soft);
+    }
+    .signal-card span { color: var(--text-soft); font-size: 0.87rem; line-height: 1.35; }
+    .signal-card strong { font-size: 1.04rem; letter-spacing: -0.02em; }
+    .signal-card code {
+      font-family: "IBM Plex Mono",ui-monospace,SFMono-Regular,monospace;
+      font-size: 0.82rem; color: var(--accent-strong);
+      background: rgba(139,211,199,0.08); padding: 0.22rem 0.4rem;
+      border-radius: 999px; width: fit-content;
+    }
+    .signal-board { padding: 16px; border-radius: 18px; background: linear-gradient(180deg, rgba(201,168,76,0.08), rgba(255,255,255,0.02)); border: 1px solid rgba(201,168,76,0.16); display: grid; gap: 10px; }
+    .signal-board h2 { font-size: 1.06rem; line-height: 1.2; }
+    .signal-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+    .signal-list li { display: flex; align-items: flex-start; gap: 10px; color: var(--text-muted); line-height: 1.55; }
+    .signal-list svg { width: 16px; height: 16px; margin-top: 2px; color: var(--accent); flex: none; }
+
+    /* ── WORKSPACE ── */
+    .workspace { display: grid; grid-template-columns: minmax(0,1.06fr) minmax(300px,0.94fr); gap: 24px; align-items: start; }
+    .panel { padding: 24px; }
+    .panel-header { display: grid; gap: 10px; margin-bottom: 20px; }
+    .panel-header h2 { font-size: clamp(1.4rem,2.1vw,1.9rem); line-height: 1.1; }
+
+    .form-status {
+      margin: 0; padding: 0.85rem 1rem; border-radius: var(--radius-md);
+      border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.025);
+      font-size: 0.94rem;
+    }
+    .form-status.is-error { border-color: rgba(247,167,183,0.2); background: var(--danger-bg); color: #ffd8e1; }
+    .form-status.is-success { border-color: rgba(142,214,179,0.18); background: var(--success-bg); color: #d8f5e6; }
+
+    form { display: grid; gap: 20px; }
+    fieldset { margin: 0; padding: 0; border: 0; display: grid; gap: 14px; }
+    legend { margin-bottom: 4px; padding: 0; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-soft); }
+    .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; }
+    .field-grid.triple { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .field { display: grid; gap: 8px; }
+    label { font-size: 0.96rem; font-weight: 600; letter-spacing: -0.01em; color: var(--text); }
+
+    input, select {
+      width: 100%; min-height: 48px; padding: 0.86rem 0.95rem;
+      border-radius: 14px; border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.03); color: var(--text); font: inherit;
+      transition: border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out), background-color 160ms var(--ease-out);
+      outline: none;
+    }
+    select {
+      appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, var(--accent-strong) 50%), linear-gradient(135deg, var(--accent-strong) 50%, transparent 50%);
+      background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 12px) calc(50% - 3px);
+      background-size: 6px 6px, 6px 6px; background-repeat: no-repeat;
+      padding-right: 2.25rem; background-color: rgba(20,25,34,0.6);
+      color: var(--text); font-weight: 500;
+    }
+    select option { background-color: rgba(16,20,27,0.95); color: var(--text); padding: 8px 12px; font-weight: 500; }
+    select option:checked { background-color: rgba(139,211,199,0.2); color: var(--accent-strong); font-weight: 600; }
+    input::placeholder { color: rgba(221,227,236,0.42); }
+    input:hover, select:hover { border-color: rgba(255,255,255,0.24); background-color: rgba(20,25,34,0.75); }
+    input:hover { background: rgba(255,255,255,0.05); }
+    input:focus-visible, select:focus-visible, .button:focus-visible, .button-secondary:focus-visible {
+      border-color: rgba(var(--accent-rgb),0.86);
+      box-shadow: 0 0 0 4px rgba(var(--accent-rgb),0.16);
+    }
+    input[aria-invalid="true"], select[aria-invalid="true"] {
+      border-color: rgba(247,167,183,0.55);
+      box-shadow: 0 0 0 4px rgba(247,167,183,0.08);
+    }
+    .field-message { margin: 0; font-size: 0.83rem; min-height: 1.2em; color: var(--text-soft); }
+    .field-message.is-error { color: #fbc4d0; }
+
+    .actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding-top: 4px; }
+
+    /* ── RESULTS PANEL ── */
+    .results-panel {
+      position: sticky; top: 20px; padding: 24px;
+      display: grid; gap: 18px; overflow: hidden;
+    }
+    .results-panel::before {
+      content: ""; position: absolute; inset: 0; pointer-events: none;
+      background:
+        radial-gradient(circle at 15% 0%, rgba(201,168,76,0.10), transparent 26%),
+        radial-gradient(circle at 92% 12%, rgba(180,100,80,0.06), transparent 22%);
+      opacity: 0.88;
+    }
+    .results-shell, .results-skeleton { position: relative; z-index: 1; }
+    .results-shell {
+      display: grid; gap: 16px;
+      transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out), filter 180ms var(--ease-out);
+    }
+    .results-panel[data-state="loading"] .results-shell { transform: translateY(2px); opacity: 0.3; filter: blur(1px); pointer-events: none; }
+    .results-panel[data-state="idle"] .results-shell { opacity: 0.9; }
+    .results-panel[data-state="success"] .results-shell, .results-panel[data-state="error"] .results-shell { opacity: 1; }
+
+    .results-kicker { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .results-kicker h2 { font-size: clamp(1.35rem,2vw,1.85rem); }
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 8px; padding: 0.55rem 0.82rem;
+      border-radius: 999px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      color: var(--text-muted); font-size: 0.84rem; white-space: nowrap;
+    }
+    .status-pill .pulse { width: 8px; height: 8px; border-radius: 999px; background: var(--accent); box-shadow: 0 0 0 4px rgba(var(--accent-rgb),0.12); }
+
+    /* Diagnosis display — replaces salary display */
+    .diagnosis-display {
+      border-radius: 22px; padding: 20px;
+      background: linear-gradient(180deg, rgba(var(--accent-rgb),0.14), rgba(255,255,255,0.03));
+      border: 1px solid rgba(var(--accent-rgb),0.16);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+      display: grid; gap: 10px;
+      transition: background 220ms var(--ease-out), border-color 220ms var(--ease-out);
+    }
+    .diagnosis-label { color: var(--text-soft); font-size: 0.87rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; }
+    .diagnosis-value { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .diagnosis-icon {
+      width: 44px; height: 44px; border-radius: 14px; flex: none;
+      background: rgba(var(--accent-rgb),0.14); border: 1px solid rgba(var(--accent-rgb),0.22);
+      display: grid; place-items: center;
+    }
+    .diagnosis-icon svg { width: 22px; height: 22px; color: var(--accent-strong); }
+    .diagnosis-outcome { display: grid; gap: 3px; }
+    .diagnosis-outcome strong { font-size: clamp(1.5rem,3.5vw,2.4rem); line-height: 1.0; letter-spacing: -0.04em; }
+    .diagnosis-outcome span { color: var(--text-muted); font-size: 0.92rem; }
+
+    /* Negative / disease detected state */
+    .diagnosis-display.is-positive {
+      background: linear-gradient(180deg, rgba(247,167,183,0.12), rgba(255,255,255,0.02));
+      border-color: rgba(247,167,183,0.2);
+    }
+    .diagnosis-display.is-positive .diagnosis-icon { background: rgba(247,167,183,0.1); border-color: rgba(247,167,183,0.22); }
+    .diagnosis-display.is-positive .diagnosis-icon svg { color: var(--danger); }
+    .diagnosis-display.is-positive .diagnosis-outcome strong { color: var(--danger); }
+
+    .results-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+    .metric { padding: 16px; border-radius: 18px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); display: grid; gap: 10px; }
+    .metric span { color: var(--text-soft); font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; }
+    .metric strong { font-size: 1.35rem; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+    .metric p { margin: 0; color: var(--text-muted); font-size: 0.91rem; line-height: 1.5; }
+
+    .results-note { margin: 0; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 0.92rem; color: var(--text-muted); line-height: 1.6; }
+
+    .results-panel[data-state="error"] { border-color: rgba(247,167,183,0.24); box-shadow: 0 30px 80px rgba(50,17,25,0.34), 0 6px 20px rgba(7,10,17,0.24); }
+    .results-panel[data-state="success"] { border-color: rgba(201,168,76,0.22); box-shadow: 0 30px 90px rgba(0,0,0,0.48), 0 0 0 1px rgba(201,168,76,0.06); }
+    .results-panel[data-state="error"] .status-pill { color: #ffd8e1; background: rgba(247,167,183,0.08); border-color: rgba(247,167,183,0.16); }
+
+    /* Skeleton */
+    .results-skeleton { display: none; gap: 14px; }
+    .skeleton-line, .skeleton-block, .skeleton-pill { position: relative; overflow: hidden; background: rgba(255,255,255,0.06); }
+    .skeleton-line::after, .skeleton-block::after, .skeleton-pill::after {
+      content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+      animation: shimmer 1.4s linear infinite;
+    }
+    .skeleton-pill { width: 112px; height: 32px; border-radius: 999px; }
+    .skeleton-line { height: 16px; border-radius: 999px; }
+    .skeleton-block { height: 110px; border-radius: 20px; }
+    .results-panel[data-state="loading"] .results-skeleton { display: grid; }
+    .results-panel[data-state="loading"] .results-shell, .results-panel[data-state="idle"] .results-skeleton { display: none; }
+
+    /* Empty state */
+    .results-panel[data-state="idle"] .empty-state { display: grid; }
+    .results-panel[data-state="success"] .empty-state,
+    .results-panel[data-state="error"] .empty-state,
+    .results-panel[data-state="loading"] .empty-state { display: none; }
+    .empty-state { display: grid; gap: 12px; padding-top: 2px; }
+    .empty-state h3 { font-size: 1.08rem; }
+    .empty-state p { margin: 0; color: var(--text-muted); line-height: 1.6; }
+    .empty-state ul { margin: 0; padding-left: 18px; color: var(--text-muted); line-height: 1.6; }
+
+    /* Footer */
+    .footer {
+      margin-top: 24px; padding: 16px 4px 0; display: flex; flex-wrap: wrap;
+      justify-content: space-between; gap: 14px; align-items: center;
+      color: var(--text-soft); font-size: 0.9rem;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+    .footer nav { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+    .footer a { color: var(--text-muted); transition: color 160ms var(--ease-soft); }
+    .footer a:hover { color: var(--text); }
+
+    /* Animations */
+    @keyframes shimmer { 100% { transform: translateX(100%); } }
+
+    /* Hover guards — touch safe */
+    @media (hover: hover) and (pointer: fine) {
+      .button:hover { transform: translateY(-1px); box-shadow: 0 18px 38px rgba(80,55,5,0.4); }
+      .button-secondary:hover { transform: translateY(-1px); background: rgba(255,255,255,0.05); }
+      .hero-copy:hover, .hero-signal:hover, .panel:hover, .results-panel:hover { border-color: rgba(255,255,255,0.22); }
+      .signal-card:hover { background: rgba(255,255,255,0.05); transform: translateY(-1px); }
+    }
+
+    /* Responsive */
+    @media (max-width: 1100px) {
+      .hero, .workspace { grid-template-columns: 1fr; }
+      .results-panel { position: relative; top: 0; }
+      h1 { max-width: 16ch; }
+    }
+    @media (max-width: 760px) {
+      .page { padding: 18px 14px 28px; }
+      .topbar { align-items: flex-start; flex-direction: column; }
+      .topbar-meta { justify-content: flex-start; }
+      .hero-copy, .hero-signal, .panel, .results-panel { border-radius: 22px; padding: 20px; }
+      .field-grid, .field-grid.triple, .results-grid, .signal-grid { grid-template-columns: 1fr; }
+      .diagnosis-outcome strong { font-size: clamp(1.4rem,8vw,2rem); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+      .skeleton-line::after, .skeleton-block::after, .skeleton-pill::after { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#predictor">Skip to predictor</a>
+  <div class="page">
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="Heart disease prediction home">
+        <span class="brand-mark">HD</span>
+        <span class="brand-copy">
+          <strong>Heart disease prediction</strong>
+          <span>SVM classifier trained on UCI clinical data</span>
+        </span>
+      </a>
+      <div class="topbar-meta" aria-label="Project metadata">
+        <span class="chip">
+          <span class="dot" aria-hidden="true"></span>
+          <strong>Binary</strong> classification
+        </span>
+        <span class="chip">
+          Model route <strong>/api/v1/predict</strong>
+        </span>
+        <a class="chip" href="/docs">Swagger docs</a>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">Clinical risk screening</p>
+          <h1 id="hero-title">Predict heart disease presence from patient data.</h1>
+          <p>Enter clinical measurements from a patient profile — the same 12 features the model was trained on — and receive an instant binary prediction: disease present or absent.</p>
+          <div class="hero-actions">
+            <a class="button" href="#predictor">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+              </svg>
+              Run prediction
+            </a>
+            <a class="button-secondary" href="/api/v1/health">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 21s7-4.4 7-11V6l-7-3-7 3v4c0 6.6 7 11 7 11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                <path d="M9.5 12.2 11.5 14l3.2-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Check API health
+            </a>
+          </div>
+        </div>
+        <aside class="hero-signal" aria-label="Project summary">
+          <div class="signal-grid">
+            <article class="signal-card">
+              <span>Inputs</span>
+              <strong>12 clinical fields</strong>
+              <code>schema matched</code>
+            </article>
+            <article class="signal-card">
+              <span>Output</span>
+              <strong>Binary diagnosis</strong>
+              <code>0 or 1</code>
+            </article>
+            <article class="signal-card">
+              <span>Model family</span>
+              <strong>SVM — RBF kernel</strong>
+              <code>probability=True</code>
+            </article>
+            <article class="signal-card">
+              <span>Response</span>
+              <strong>FastAPI JSON</strong>
+              <code>/api/v1/predict</code>
+            </article>
+          </div>
+          <div class="signal-board">
+            <h2>What this interface does</h2>
+            <ul class="signal-list">
+              <li>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5 9 16l10-10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Validates all 12 fields inline before the request is sent.
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5 9 16l10-10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Returns a clear disease-present or disease-absent result with skeleton loading.
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5 9 16l10-10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Surfaces request latency and full error state on API failure.
+              </li>
+            </ul>
+          </div>
+        </aside>
+      </section>
+
+      <section class="workspace" id="predictor" aria-labelledby="predictor-title">
+        <section class="panel">
+          <div class="panel-header">
+            <p class="eyebrow">Prediction form</p>
+            <h2 id="predictor-title">Enter a patient profile</h2>
+            <p class="panel-copy">Field values align with the model's training schema. All inputs use the exact cleaned labels the classifier was trained on.</p>
+            <p class="form-status" id="formStatus" role="status" aria-live="polite">Ready. Complete the fields and submit to run the prediction.</p>
+          </div>
+
+          <form id="predictForm" novalidate>
+            <!-- Section 1: Demographics -->
+            <fieldset>
+              <legend>Demographics</legend>
+              <div class="field-grid">
+                <div class="field">
+                  <label for="age">Age</label>
+                  <input id="age" name="age" type="number" min="18" max="120" step="1" inputmode="numeric" placeholder="e.g. 54" required />
+                  <p class="field-message" data-error-for="age" data-default="Integer between 18 and 120.">Integer between 18 and 120.</p>
+                </div>
+                <div class="field">
+                  <label for="sex">Sex</label>
+                  <select id="sex" name="sex" required>
+                    <option value="">Select...</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                  </select>
+                  <p class="field-message" data-error-for="sex" data-default="Select biological sex.">Select biological sex.</p>
+                </div>
+              </div>
+            </fieldset>
+
+            <!-- Section 2: Symptoms -->
+            <fieldset>
+              <legend>Symptoms</legend>
+              <div class="field-grid">
+                <div class="field">
+                  <label for="chest_pains">Chest pain type</label>
+                  <select id="chest_pains" name="chest_pains" required>
+                    <option value="">Select...</option>
+                    <option value="1">1 — Typical angina</option>
+                    <option value="2">2 — Atypical angina</option>
+                    <option value="3">3 — Non-anginal pain</option>
+                    <option value="4">4 — Asymptomatic</option>
+                  </select>
+                  <p class="field-message" data-error-for="chest_pains" data-default="Select chest pain classification.">Select chest pain classification.</p>
+                </div>
+                <div class="field">
+                  <label for="exercise_induced_angina">Exercise-induced angina</label>
+                  <select id="exercise_induced_angina" name="exercise_induced_angina" required>
+                    <option value="">Select...</option>
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                  </select>
+                  <p class="field-message" data-error-for="exercise_induced_angina" data-default="Angina triggered by exercise.">Angina triggered by exercise.</p>
+                </div>
+              </div>
+            </fieldset>
+
+            <!-- Section 3: Vitals -->
+            <fieldset>
+              <legend>Vitals</legend>
+              <div class="field-grid triple">
+                <div class="field">
+                  <label for="resting_blood_pressure">Resting BP (mm Hg)</label>
+                  <input id="resting_blood_pressure" name="resting_blood_pressure" type="number" min="80" max="220" step="1" inputmode="numeric" placeholder="e.g. 130" required />
+                  <p class="field-message" data-error-for="resting_blood_pressure" data-default="80 to 220 mm Hg.">80 to 220 mm Hg.</p>
+                </div>
+                <div class="field">
+                  <label for="cholesterol">Cholesterol (mg/dl)</label>
+                  <input id="cholesterol" name="cholesterol" type="number" min="100" max="600" step="1" inputmode="numeric" placeholder="e.g. 250" required />
+                  <p class="field-message" data-error-for="cholesterol" data-default="Serum cholesterol, 100 to 600.">Serum cholesterol, 100 to 600.</p>
+                </div>
+                <div class="field">
+                  <label for="max_heart_rate">Max heart rate</label>
+                  <input id="max_heart_rate" name="max_heart_rate" type="number" min="60" max="220" step="1" inputmode="numeric" placeholder="e.g. 150" required />
+                  <p class="field-message" data-error-for="max_heart_rate" data-default="Maximum achieved HR, 60 to 220.">Maximum achieved HR, 60 to 220.</p>
+                </div>
+              </div>
+            </fieldset>
+
+            <!-- Section 4: Clinical tests -->
+            <fieldset>
+              <legend>Clinical tests</legend>
+              <div class="field-grid">
+                <div class="field">
+                  <label for="fasting_blood_sugar">Fasting blood sugar &gt; 120 mg/dl</label>
+                  <select id="fasting_blood_sugar" name="fasting_blood_sugar" required>
+                    <option value="">Select...</option>
+                    <option value="false">No (120 mg/dl or below)</option>
+                    <option value="true">Yes (above 120 mg/dl)</option>
+                  </select>
+                  <p class="field-message" data-error-for="fasting_blood_sugar" data-default="Select fasting blood sugar threshold.">Select fasting blood sugar threshold.</p>
+                </div>
+                <div class="field">
+                  <label for="rest_ecg">Resting ECG result</label>
+                  <select id="rest_ecg" name="rest_ecg" required>
+                    <option value="">Select...</option>
+                    <option value="0">0 — Normal</option>
+                    <option value="1">1 — ST-T wave abnormality</option>
+                    <option value="2">2 — Left ventricular hypertrophy</option>
+                  </select>
+                  <p class="field-message" data-error-for="rest_ecg" data-default="Select resting ECG classification.">Select resting ECG classification.</p>
+                </div>
+                <div class="field">
+                  <label for="oldpeak">ST depression (oldpeak)</label>
+                  <input id="oldpeak" name="oldpeak" type="number" min="0" max="10" step="0.1" inputmode="decimal" placeholder="e.g. 1.4" required />
+                  <p class="field-message" data-error-for="oldpeak" data-default="Exercise-induced ST depression, 0.0 to 10.0.">Exercise-induced ST depression, 0.0 to 10.0.</p>
+                </div>
+                <div class="field">
+                  <label for="slope">Peak exercise ST slope</label>
+                  <select id="slope" name="slope" required>
+                    <option value="">Select...</option>
+                    <option value="1">1 — Upsloping</option>
+                    <option value="2">2 — Flat</option>
+                    <option value="3">3 — Downsloping</option>
+                  </select>
+                  <p class="field-message" data-error-for="slope" data-default="Slope of peak exercise ST segment.">Slope of peak exercise ST segment.</p>
+                </div>
+                <div class="field">
+                  <label for="thalassemia">Thalassemia</label>
+                  <select id="thalassemia" name="thalassemia" required>
+                    <option value="">Select...</option>
+                    <option value="3">3 — Normal</option>
+                    <option value="6">6 — Fixed defect</option>
+                    <option value="7">7 — Reversable defect</option>
+                  </select>
+                  <p class="field-message" data-error-for="thalassemia" data-default="Select thalassemia classification.">Select thalassemia classification.</p>
+                </div>
+              </div>
+            </fieldset>
+
+            <div class="actions">
+              <button class="button" id="predictBtn" type="submit">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+                </svg>
+                Run prediction
+              </button>
+              <button class="button-secondary" type="button" id="resetBtn">Reset form</button>
+            </div>
+          </form>
+        </section>
+
+        <!-- Results panel -->
+        <aside class="results-panel" id="resultPanel" data-state="idle" aria-live="polite" aria-atomic="true" aria-labelledby="results-title">
+          <div class="results-skeleton" aria-hidden="true">
+            <div class="skeleton-pill"></div>
+            <div class="skeleton-line" style="width:60%"></div>
+            <div class="skeleton-block"></div>
+            <div class="skeleton-block"></div>
+            <div class="skeleton-line" style="width:80%"></div>
+          </div>
+
+          <div class="results-shell">
+            <div class="results-kicker">
+              <div>
+                <p class="eyebrow">Prediction result</p>
+                <h2 id="results-title">Awaiting input</h2>
+              </div>
+              <span class="status-pill" id="resultState">
+                <span class="pulse" aria-hidden="true"></span>
+                Idle
+              </span>
+            </div>
+
+            <section class="diagnosis-display" id="diagnosisDisplay" aria-labelledby="diagnosis-label">
+              <div class="diagnosis-label" id="diagnosis-label">Diagnosis</div>
+              <div class="diagnosis-value">
+                <div class="diagnosis-icon" id="diagnosisIcon">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 22C12 22 3 17 3 10V5l9-3 9 3v5c0 7-9 12-9 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+                <div class="diagnosis-outcome">
+                  <strong id="diagnosisOutcome">--</strong>
+                  <span id="diagnosisMeta">Submit the form to run classification.</span>
+                </div>
+              </div>
+            </section>
+
+            <div class="results-grid">
+              <article class="metric">
+                <span>Raw prediction</span>
+                <strong id="rawPrediction">--</strong>
+                <p id="rawNote">0 = no disease, 1 = disease present.</p>
+              </article>
+              <article class="metric">
+                <span>Request latency</span>
+                <strong id="latencyValue">--</strong>
+                <p id="latencyNote">Measured from submit to response.</p>
+              </article>
+            </div>
+
+            <p class="results-note" id="resultsNote">
+              This is a research-grade classifier trained on the UCI heart disease dataset. It is not a clinical diagnostic tool. Results should not inform medical decisions without professional review.
+            </p>
+
+            <div class="empty-state" id="emptyState">
+              <h3>No prediction run yet.</h3>
+              <p>Fill in the patient profile on the left and submit. The result panel will update with the diagnosis, raw prediction value, and request timing.</p>
+              <ul>
+                <li>All fields are validated inline before the request leaves the page.</li>
+                <li>The result panel is sticky on wide screens so the outcome stays visible.</li>
+                <li>On error, this panel shows the API detail and latency for debugging.</li>
+              </ul>
+            </div>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>SVM classifier — UCI heart disease dataset — four clinical sites combined.</p>
+      <nav aria-label="Footer links">
+        <a href="/docs">API docs</a>
+        <a href="/api/v1/health">Health check</a>
+        <a href="#top">Back to top</a>
+      </nav>
+    </footer>
+  </div>
+
+  <script>
+    const FIELDS = [
+      "age","sex","chest_pains","resting_blood_pressure","cholesterol",
+      "fasting_blood_sugar","rest_ecg","max_heart_rate",
+      "exercise_induced_angina","oldpeak","slope","thalassemia"
+    ];
+
+    const LABELS = {
+      age: "age",
+      sex: "sex",
+      chest_pains: "chest pain type",
+      resting_blood_pressure: "resting blood pressure",
+      cholesterol: "cholesterol",
+      fasting_blood_sugar: "fasting blood sugar",
+      rest_ecg: "resting ECG result",
+      max_heart_rate: "max heart rate",
+      exercise_induced_angina: "exercise-induced angina",
+      oldpeak: "ST depression",
+      slope: "ST slope",
+      thalassemia: "thalassemia"
+    };
+
+    const defaultMessages = new Map();
+    document.querySelectorAll("[data-error-for]").forEach(function(node) {
+      defaultMessages.set(node.getAttribute("data-error-for"), node.dataset.default || node.textContent.trim());
+    });
+
+    // ── DOM refs ──
+    const form        = document.getElementById("predictForm");
+    const resultPanel = document.getElementById("resultPanel");
+    const predictBtn  = document.getElementById("predictBtn");
+    const resetBtn    = document.getElementById("resetBtn");
+    const formStatus  = document.getElementById("formStatus");
+    const resultState = document.getElementById("resultState");
+    const resultsTitle        = document.getElementById("results-title");
+    const diagnosisDisplay    = document.getElementById("diagnosisDisplay");
+    const diagnosisOutcome    = document.getElementById("diagnosisOutcome");
+    const diagnosisMeta       = document.getElementById("diagnosisMeta");
+    const diagnosisIcon       = document.getElementById("diagnosisIcon");
+    const rawPrediction       = document.getElementById("rawPrediction");
+    const rawNote             = document.getElementById("rawNote");
+    const latencyValue        = document.getElementById("latencyValue");
+    const latencyNote         = document.getElementById("latencyNote");
+    const resultsNote         = document.getElementById("resultsNote");
+    const emptyState          = document.getElementById("emptyState");
+
+    // ── State helpers ──
+    function setPanelState(state) {
+      resultPanel.dataset.state = state;
+      const pulseHtml = '<span class="pulse" aria-hidden="true"></span>';
+      if (state === "loading")  { resultState.innerHTML = pulseHtml + "Calculating"; formStatus.textContent = "Running classification..."; return; }
+      if (state === "success")  { resultState.innerHTML = pulseHtml + "Complete"; return; }
+      if (state === "error")    { resultState.innerHTML = pulseHtml + "Error"; return; }
+      resultState.innerHTML = pulseHtml + "Idle";
+    }
+
+    function setFieldMessage(fieldId, message, isError) {
+      const msg   = document.querySelector('[data-error-for="' + fieldId + '"]');
+      const input = document.getElementById(fieldId);
+      if (!msg) return;
+      msg.textContent = message || defaultMessages.get(fieldId) || "";
+      msg.classList.toggle("is-error", Boolean(isError));
+      if (input) input.setAttribute("aria-invalid", isError ? "true" : "false");
+    }
+
+    function clearFieldMessages() {
+      FIELDS.forEach(function(id) { setFieldMessage(id, defaultMessages.get(id) || "", false); });
+      formStatus.classList.remove("is-error", "is-success");
+    }
+
+    // ── Validation ──
+    function validateField(fieldId) {
+      const input = document.getElementById(fieldId);
+      if (!input) return "";
+      const value = input.value.trim();
+      let message = "";
+
+      if (input.required && !value) {
+        message = "Please enter " + (LABELS[fieldId] || "this field") + ".";
+      } else if (fieldId === "age" && value) {
+        const n = Number(value);
+        if (!Number.isFinite(n) || n < 18 || n > 120 || !Number.isInteger(n)) message = "Age must be a whole number between 18 and 120.";
+      } else if (fieldId === "resting_blood_pressure" && value) {
+        const n = Number(value);
+        if (!Number.isFinite(n) || n < 80 || n > 220 || !Number.isInteger(n)) message = "Enter a whole number between 80 and 220.";
+      } else if (fieldId === "cholesterol" && value) {
+        const n = Number(value);
+        if (!Number.isFinite(n) || n < 100 || n > 600 || !Number.isInteger(n)) message = "Enter a whole number between 100 and 600.";
+      } else if (fieldId === "max_heart_rate" && value) {
+        const n = Number(value);
+        if (!Number.isFinite(n) || n < 60 || n > 220 || !Number.isInteger(n)) message = "Enter a whole number between 60 and 220.";
+      } else if (fieldId === "oldpeak" && value) {
+        const n = Number(value);
+        if (!Number.isFinite(n) || n < 0 || n > 10) message = "Enter a number between 0.0 and 10.0.";
+      }
+
+      setFieldMessage(fieldId, message || defaultMessages.get(fieldId) || "", Boolean(message));
+      return message;
+    }
+
+    function validateForm() {
+      return FIELDS
+        .map(function(id) { return { fieldId: id, message: validateField(id) }; })
+        .filter(function(e) { return e.message; });
+    }
+
+    // ── Payload ──
+    function getPayload() {
+      return {
+        age:                        parseInt(document.getElementById("age").value, 10),
+        sex:                        document.getElementById("sex").value,
+        chest_pains:                parseInt(document.getElementById("chest_pains").value, 10),
+        resting_blood_pressure:     parseInt(document.getElementById("resting_blood_pressure").value, 10),
+        cholesterol:                parseInt(document.getElementById("cholesterol").value, 10),
+        fasting_blood_sugar:        document.getElementById("fasting_blood_sugar").value === "true",
+        rest_ecg:                   parseInt(document.getElementById("rest_ecg").value, 10),
+        max_heart_rate:             parseInt(document.getElementById("max_heart_rate").value, 10),
+        exercise_induced_angina:    document.getElementById("exercise_induced_angina").value === "true",
+        oldpeak:                    parseFloat(document.getElementById("oldpeak").value),
+        slope:                      parseInt(document.getElementById("slope").value, 10),
+        thalassemia:                parseInt(document.getElementById("thalassemia").value, 10)
+      };
+    }
+
+    // ── Panel display functions ──
+    function setLoadingSkeleton() {
+      setPanelState("loading");
+      resultsTitle.textContent = "Running classification";
+      diagnosisOutcome.textContent = "--";
+      diagnosisMeta.textContent = "The model is processing the patient profile.";
+      diagnosisDisplay.classList.remove("is-positive");
+      rawPrediction.textContent = "--";
+      rawNote.textContent = "0 = no disease, 1 = disease present.";
+      latencyValue.textContent = "--";
+      latencyNote.textContent = "Timing will appear after the response returns.";
+      emptyState.hidden = true;
+    }
+
+    function setIdleState() {
+      setPanelState("idle");
+      resultsTitle.textContent = "Awaiting input";
+      diagnosisOutcome.textContent = "--";
+      diagnosisMeta.textContent = "Submit the form to run classification.";
+      diagnosisDisplay.classList.remove("is-positive");
+      diagnosisIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 22C12 22 3 17 3 10V5l9-3 9 3v5c0 7-9 12-9 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>';
+      rawPrediction.textContent = "--";
+      rawNote.textContent = "0 = no disease, 1 = disease present.";
+      latencyValue.textContent = "--";
+      latencyNote.textContent = "Measured from submit to response.";
+      resultsNote.textContent = "This is a research-grade classifier trained on the UCI heart disease dataset. Results should not inform medical decisions without professional review.";
+      emptyState.hidden = false;
+    }
+
+    function setErrorState(detail, latencyText) {
+      setPanelState("error");
+      resultsTitle.textContent = "Prediction failed";
+      diagnosisOutcome.textContent = "Error";
+      diagnosisMeta.textContent = detail || "The server returned an error.";
+      diagnosisDisplay.classList.remove("is-positive");
+      diagnosisIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      rawPrediction.textContent = "--";
+      rawNote.textContent = "No result returned.";
+      latencyValue.textContent = latencyText || "--";
+      latencyNote.textContent = "The request reached the backend, but the response failed.";
+      resultsNote.textContent = detail || "The server did not return a valid prediction.";
+      emptyState.hidden = true;
+    }
+
+    function setSuccessState(prediction, elapsedMs) {
+      const isPositive = prediction === 1;
+      setPanelState("success");
+      resultsTitle.textContent = isPositive ? "Heart disease detected" : "No heart disease detected";
+      diagnosisDisplay.classList.toggle("is-positive", isPositive);
+
+      if (isPositive) {
+        diagnosisIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>';
+        diagnosisOutcome.textContent = "Disease present";
+        diagnosisMeta.textContent = "The classifier predicts heart disease is present in this patient profile.";
+      } else {
+        diagnosisIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5 9 16l10-10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        diagnosisOutcome.textContent = "No disease found";
+        diagnosisMeta.textContent = "The classifier predicts no heart disease in this patient profile.";
+      }
+
+      rawPrediction.textContent = String(prediction);
+      rawNote.textContent = isPositive ? "Value 1 — heart disease present." : "Value 0 — no heart disease.";
+      latencyValue.textContent = elapsedMs + " ms";
+      latencyNote.textContent = "Measured from submit to response.";
+      resultsNote.textContent = "Research-grade classifier, UCI heart disease dataset. Not a clinical diagnostic tool — results require professional medical review before any use in care decisions.";
+      emptyState.hidden = true;
+    }
+
+    // ── Inline validation on input ──
+    function syncValidationOnInput(event) {
+      const target = event.target;
+      if (!target || !target.id || !FIELDS.includes(target.id)) return;
+      validateField(target.id);
+      if (validateForm().length === 0) {
+        formStatus.textContent = "All fields look ready. Submit to run the prediction.";
+        formStatus.classList.remove("is-error");
+        formStatus.classList.add("is-success");
+      }
+    }
+
+    FIELDS.forEach(function(fieldId) {
+      const input = document.getElementById(fieldId);
+      if (!input) return;
+      input.addEventListener("input", syncValidationOnInput);
+      input.addEventListener("change", syncValidationOnInput);
+      input.addEventListener("blur", function() { validateField(fieldId); });
+    });
+
+    // ── Reset ──
+    resetBtn.addEventListener("click", function() {
+      form.reset();
+      clearFieldMessages();
+      setIdleState();
+      formStatus.textContent = "Ready. Complete the fields and submit to run the prediction.";
+      formStatus.classList.remove("is-error", "is-success");
+    });
+
+    // ── Submit ──
+    form.addEventListener("submit", async function(event) {
+      event.preventDefault();
+      clearFieldMessages();
+
+      const errors = validateForm();
+      if (errors.length) {
+        errors.forEach(function(e) { setFieldMessage(e.fieldId, e.message, true); });
+        const first = document.getElementById(errors[0].fieldId);
+        if (first) first.focus({ preventScroll: false });
+        formStatus.textContent = "Please fix " + errors.length + " field" + (errors.length > 1 ? "s" : "") + " before running the prediction.";
+        formStatus.classList.add("is-error");
+        setErrorState("Please correct " + errors.length + " field" + (errors.length > 1 ? "s" : "") + " and try again.");
+        return;
+      }
+
+      const payload = getPayload();
+      const startedAt = performance.now();
+      predictBtn.disabled = true;
+      predictBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg> Running...';
+      setLoadingSkeleton();
+
+      try {
+        const API_BASE = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+          ? "http://127.0.0.1:8000"
+          : window.location.origin;
+
+        const response = await fetch(API_BASE + "/api/v1/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        let data = {};
+        try { data = await response.json(); } catch(e) { data = {}; }
+
+        if (!response.ok) {
+          const detail = typeof data.detail === "string" ? data.detail : "The prediction request failed.";
+          const elapsed = Math.max(1, Math.round(performance.now() - startedAt));
+          setErrorState(detail, elapsed + " ms");
+          formStatus.textContent = detail;
+          formStatus.classList.add("is-error");
+          return;
+        }
+
+        const prediction = data.prediction;
+        if (prediction !== 0 && prediction !== 1) {
+          const elapsed = Math.max(1, Math.round(performance.now() - startedAt));
+          setErrorState("The backend returned an unexpected prediction value.", elapsed + " ms");
+          formStatus.textContent = "Unexpected prediction value from backend.";
+          formStatus.classList.add("is-error");
+          return;
+        }
+
+        const elapsed = Math.max(1, Math.round(performance.now() - startedAt));
+        setSuccessState(prediction, elapsed);
+        formStatus.textContent = prediction === 1 ? "Prediction complete — heart disease detected." : "Prediction complete — no heart disease detected.";
+        formStatus.classList.remove("is-error");
+        formStatus.classList.add("is-success");
+
+      } catch (error) {
+        console.error(error);
+        const elapsed = Math.max(1, Math.round(performance.now() - startedAt));
+        setErrorState("Connection failed. Confirm the FastAPI server is running.", elapsed + " ms");
+        formStatus.textContent = "Connection failed.";
+        formStatus.classList.add("is-error");
+      } finally {
+        predictBtn.disabled = false;
+        predictBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg> Run prediction';
+      }
+    });
+
+    // Init
+    clearFieldMessages();
+    setIdleState();
+  </script>
+</body>
+</html>

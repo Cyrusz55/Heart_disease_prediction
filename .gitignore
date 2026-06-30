@@ -1,0 +1,15 @@
+/clean_data
+/heart+disease
+/.venv
+/raw_data
+
+__pycache__/
+*.pyc
+.idea/
+
+# models
+models/
+*.pkl
+*.model
+
+.env
