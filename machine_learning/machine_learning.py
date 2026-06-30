@@ -153,7 +153,7 @@ def load_model():
         return joblib.load(local_path)
 
     # huggingface cache
-    cache_path = Path("models/models --cyrusnx--heart_disease_model/snapshots")
+    cache_path = Path("models/models--cyrusnx--heart_disease_model/snapshots")
     if cache_path.exists():
         snapshots = list(cache_path.glob("*/heart_disease_model.joblib"))
         if snapshots:
