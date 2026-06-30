@@ -40,7 +40,7 @@ def startup_event():
 
     try:
         model_path = hf_hub_download(
-            repo_id="cyrusnx/Heart-disease-Model",
+            repo_id="cyrusnx/heart_disease_model",
             filename="heart_disease_model.joblib",
             cache_dir="models",
             token=os.getenv("HF_TOKEN")
